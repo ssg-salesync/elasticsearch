@@ -5,10 +5,6 @@ metadata:
   namespace: kube-logging
 data:
   fluent.conf: |
-    <match fluent.**>
-      @type null
-    </match>
-    
     <source>
       @type tail
       path /var/log/containers/deploy-*_default_*.log
@@ -27,18 +23,18 @@ data:
       @type kubernetes_metadata
     </filter>
     
-    <match kubernetes.var.log.containers.**fluentd**.log>
+    <filter kubernetes.**>
+      @type grep
+      <exclude>
+        key log
+        pattern /GET \/ HTTP\/1.1/
+     </exclude>
+    </filter>
+    
+    <match fluent.info>
       @type null
     </match>
-    
-    <match kubernetes.var.log.containers.**kube-logging**.log>
-      @type null
-    </match>
-    
-    <match kubernetes.var.log.containers.**prometheus**.log>
-      @type null
-    </match>
-    
+
     <match kubernetes.**>
        @type elasticsearch_dynamic
        @log_level info
@@ -138,7 +134,7 @@ spec:
         image: fluent/fluentd-kubernetes-daemonset:v1.1-debian-elasticsearch
         env:
         - name:  FLUENT_ELASTICSEARCH_HOST
-          value: "elasticsearch-client.kube-logging.svc.cluster.local"
+          value: "elasticsearch-svc.kube-logging.svc.cluster.local"
         - name:  FLUENT_ELASTICSEARCH_PORT
           value: "9200"
         - name: FLUENT_ELASTICSEARCH_SCHEME
