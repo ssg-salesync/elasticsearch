@@ -39,7 +39,7 @@ metadata:
 spec:
   ports:
   - nodePort: 30920
-    port: 5601
+    port: 80
     protocol: TCP
     targetPort: 5601
   selector:
