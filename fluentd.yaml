@@ -2,9 +2,13 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: fluentd-config
-  namespace: kube-logging
+  namespace: logging
 data:
   fluent.conf: |
+    <match fluent.**>
+        # this tells fluentd to not output its log on stdout
+        @type null
+    </match>
     <source>
       @type tail
       path /var/log/containers/deploy-*_default_*.log
@@ -25,10 +29,14 @@ data:
     
     <filter kubernetes.**>
       @type grep
+      <regexp>
+        key log
+        pattern /HTTP\/1.1/
+      </regexp>
       <exclude>
         key log
         pattern /GET \/ HTTP\/1.1/
-     </exclude>
+      </exclude>    
     </filter>
     
     <match fluent.info>
@@ -69,15 +77,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: fluentd
-  namespace: kube-logging
-
+  namespace: logging
 ---
-
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: fluentd
-  namespace: kube-logging
+  namespace: logging
 rules:
 - apiGroups:
   - ""
@@ -100,13 +106,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: fluentd
-  namespace: kube-logging
+  namespace: logging
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: fluentd
-  namespace: kube-logging
+  namespace: logging
   labels:
     k8s-app: fluentd-logging
     version: v1
@@ -134,7 +140,7 @@ spec:
         image: fluent/fluentd-kubernetes-daemonset:v1.1-debian-elasticsearch
         env:
         - name:  FLUENT_ELASTICSEARCH_HOST
-          value: "elasticsearch-svc.kube-logging.svc.cluster.local"
+          value: "elasticsearch-client.logging.svc.cluster.local"
         - name:  FLUENT_ELASTICSEARCH_PORT
           value: "9200"
         - name: FLUENT_ELASTICSEARCH_SCHEME

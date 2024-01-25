@@ -1,8 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: logging
+  name: kibana-config
+  labels:
+    app: kibana
+data:
+  kibana.yml: |-
+    server.host: "0"
+    elasticsearch:
+      hosts: [ "http://elasticsearch-client.logging.svc.cluster.local:9200" ]
+      username: ${ELASTICSEARCH_USER}
+      password: ${ELASTICSEARCH_PASSWORD}
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: logging
   name: kibana
-  namespace: kube-logging
   labels:
     app: kibana
 spec:
@@ -17,31 +34,48 @@ spec:
     spec:
       containers:
       - name: kibana
-        image: elastic/kibana:6.8.6
-        env:
-#        - name: SERVER_NAME
-#          value: "kibana.kubenetes.example.com"
-        - name: ELASTICSEARCH_URL
-          value: "http://elasticsearch-svc.kube-logging.svc.cluster.local:9200"
+        image: docker.elastic.co/kibana/kibana:7.3.0
         ports:
         - containerPort: 5601
+          name: webinterface
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch-client.logging.svc.cluster.local:9200"
+        - name: ELASTICSEARCH_USER
+          value: "elastic"
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-pw-elastic
+              key: password
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          readOnly: true
+          subPath: kibana.yml
+      volumes:
+      - name: config
+        configMap:
+          name: kibana-config
+
 ---
+
+
 apiVersion: v1
 kind: Service
 metadata:
-  labels:
-    app: kibana
-  name: kibana-svc
+  namespace: logging
+  name: kibana
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-0889e2a4d6d693e13,subnet-0689de445b67b123e
     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
-  namespace: kube-logging
+  labels:
+    app: kibana
 spec:
+  type: LoadBalancer
   ports:
-  - nodePort: 30920
-    port: 80
-    protocol: TCP
+  - port: 80
+    name: webinterface
     targetPort: 5601
   selector:
     app: kibana
-  type: LoadBalancer
